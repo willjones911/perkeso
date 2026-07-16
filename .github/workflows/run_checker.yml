@@ -1,0 +1,87 @@
+name: PERKESO IC Checker
+
+on:
+  # Runs every 30 minutes — each job takes ~25 min so there's
+  # only a ~5 min gap between scans. Effectively continuous.
+  schedule:
+    - cron: '*/30 * * * *'
+
+  # Manual trigger with optional overrides
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '1=Adaptive random (recommended)  4=Systematic A-Z'
+        default: '1'
+      runtime_minutes:
+        description: 'Minutes to scan per job'
+        default: '22'
+      from_year:
+        description: 'Birth year from'
+        default: '1965'
+      to_year:
+        description: 'Birth year to'
+        default: '2000'
+
+# Only one run at a time. If the 30-min cron fires while a
+# job is still running, it queues — never cancels mid-scan.
+concurrency:
+  group: perkeso-checker
+  cancel-in-progress: false
+
+jobs:
+  run-checker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run IC Checker
+        run: |
+          python ic_checker.py \
+            --mode "${{ github.event.inputs.mode || '1' }}" \
+            --workers 3 \
+            --from-year "${{ github.event.inputs.from_year || '1965' }}" \
+            --to-year   "${{ github.event.inputs.to_year   || '2000' }}" \
+            --max-runtime "${{ github.event.inputs.runtime_minutes || '22' }}"
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage result files first
+          git add ic_results/master_valid.json \
+                  ic_results/master_invalid.json \
+                  ic_results/master_progress.json 2>/dev/null || true
+
+          # Exit early if nothing changed
+          if git diff --staged --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+
+          # --autostash: stashes our staged changes before rebasing,
+          # reapplies them after — fixes "unstaged changes" error
+          git pull --rebase --autostash origin main
+
+          VALID=$(python -c "import json,os; f='ic_results/master_valid.json'; print(len(json.load(open(f))) if os.path.exists(f) else 0)" 2>/dev/null || echo "?")
+          INVALID=$(python -c "import json,os; f='ic_results/master_invalid.json'; print(len(json.load(open(f))) if os.path.exists(f) else 0)" 2>/dev/null || echo "?")
+
+          git commit -m "scan $(date -u +'%Y-%m-%d %H:%M UTC') | valid: ${VALID} | invalid: ${INVALID}"
+          git push
