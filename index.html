@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOCSO Radar — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Theme tokens ──────────────────────────────────────────────────────────── */
+:root {
+  --radius: 10px;
+  --radius-sm: 6px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
+  --transition: .18s ease;
+}
+
+[data-theme="dark"] {
+  --bg:         #0A0E17;
+  --bg2:        #0F1623;
+  --surface:    #131C2E;
+  --surface2:   #1A2540;
+  --border:     #1E2D42;
+  --border2:    #253350;
+  --text:       #E2E8F0;
+  --text2:      #94A3B8;
+  --text3:      #4B5563;
+  --bright:     #F8FAFC;
+  --green:      #10B981;
+  --green-bg:   rgba(16,185,129,.12);
+  --red:        #F87171;
+  --red-bg:     rgba(248,113,113,.10);
+  --blue:       #60A5FA;
+  --blue-bg:    rgba(96,165,250,.10);
+  --amber:      #FBBF24;
+  --amber-bg:   rgba(251,191,36,.10);
+  --pink:       #F472B6;
+  --shadow:     0 1px 3px rgba(0,0,0,.4);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,.5);
+}
+
+[data-theme="light"] {
+  --bg:         #F1F5F9;
+  --bg2:        #E8EDF5;
+  --surface:    #FFFFFF;
+  --surface2:   #F8FAFC;
+  --border:     #E2E8F0;
+  --border2:    #CBD5E1;
+  --text:       #1E293B;
+  --text2:      #475569;
+  --text3:      #94A3B8;
+  --bright:     #0F172A;
+  --green:      #059669;
+  --green-bg:   rgba(5,150,105,.08);
+  --red:        #DC2626;
+  --red-bg:     rgba(220,38,38,.07);
+  --blue:       #2563EB;
+  --blue-bg:    rgba(37,99,235,.08);
+  --amber:      #D97706;
+  --amber-bg:   rgba(217,119,6,.08);
+  --pink:       #DB2777;
+  --shadow:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg:  0 10px 40px rgba(0,0,0,.12);
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--shadow);
+}
+
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+
+.logo-icon {
+  width: 34px; height: 34px;
+  background: var(--green);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; flex-shrink: 0;
+}
+.logo-icon::before {
+  content: '';
+  width: 18px; height: 18px;
+  border: 2.5px solid rgba(255,255,255,.9);
+  border-radius: 50%;
+  position: absolute;
+}
+.logo-icon::after {
+  content: '';
+  width: 50%; height: 2.5px;
+  background: white;
+  position: absolute;
+  left: 50%; top: 50%;
+  transform-origin: left center;
+  animation: sweep 3s linear infinite;
+}
+@keyframes sweep { to { transform: rotate(360deg); } }
+
+.logo-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--bright);
+  letter-spacing: -.2px;
+}
+.logo-tag {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 1px;
+  display: none;
+}
+@media(min-width:500px) { .logo-tag { display: block; } }
+
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+/* Live badge */
+.live-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--green-bg);
+  border: 1px solid var(--green);
+  border-opacity: .3;
+  color: var(--green);
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s ease-in-out infinite; }
+.dot.err { background: var(--red); animation: none; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* Theme toggle */
+.theme-btn {
+  width: 36px; height: 36px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  transition: all var(--transition);
+}
+.theme-btn:hover { border-color: var(--green); color: var(--green); }
+
+/* Refresh btn */
+.refresh-btn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--sans);
+  font-weight: 500;
+  transition: all var(--transition);
+  display: flex; align-items: center; gap: 6px;
+}
+.refresh-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+
+/* ── Main layout ───────────────────────────────────────────────────────────── */
+main { max-width: 1280px; margin: 0 auto; padding: 28px 20px 60px; }
+
+/* ── Stat cards ────────────────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 32px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.stat-card { padding: 20px 22px; }
+.stat-accent { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.stat-dot.green { background: var(--green); }
+.stat-dot.red   { background: var(--red); }
+.stat-dot.amber { background: var(--amber); }
+.stat-dot.blue  { background: var(--blue); }
+.stat-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+
+.stat-val { font-size: 32px; font-weight: 700; color: var(--bright); line-height: 1; font-family: var(--mono); }
+.stat-sub { font-size: 11px; color: var(--text3); margin-top: 6px; }
+
+/* ── Section ───────────────────────────────────────────────────────────────── */
+.section { margin-bottom: 32px; }
+.section-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; margin-bottom: 14px;
+}
+.section-title {
+  font-size: 13px; font-weight: 600; color: var(--bright);
+  display: flex; align-items: center; gap: 8px;
+}
+.count-badge {
+  font-size: 10px; font-weight: 700; font-family: var(--mono);
+  padding: 2px 8px; border-radius: 99px;
+}
+.count-badge.green { background: var(--green-bg); color: var(--green); }
+.count-badge.red   { background: var(--red-bg);   color: var(--red); }
+
+.hint { font-size: 11px; color: var(--text3); font-style: italic; }
+
+/* ── Search ────────────────────────────────────────────────────────────────── */
+.search-wrap { position: relative; }
+.search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
+#search {
+  width: 240px; height: 36px;
+  padding: 0 12px 0 34px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--sans);
+  outline: none;
+  transition: border-color var(--transition), width var(--transition);
+}
+#search:focus { border-color: var(--green); width: 280px; }
+#search::placeholder { color: var(--text3); }
+
+/* ── Table ─────────────────────────────────────────────────────────────────── */
+.table-card { overflow: hidden; }
+
+.table-scroll { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; min-width: 600px; }
+
+thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+
+th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text2);
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: color var(--transition);
+}
+th:hover { color: var(--green); }
+th.active { color: var(--green); }
+.arrow { margin-left: 4px; opacity: .5; }
+th.active .arrow { opacity: 1; }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+
+td { padding: 11px 16px; font-size: 13px; }
+
+.td-ic    { font-family: var(--mono); font-size: 12px; color: var(--green); font-weight: 600; letter-spacing: .3px; }
+.td-name  { font-weight: 600; color: var(--bright); }
+.td-dob   { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+.td-male  { color: var(--blue); font-weight: 500; }
+.td-fem   { color: var(--pink); font-weight: 500; }
+.td-state { color: var(--text); }
+.td-date  { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.td-arrow { color: var(--text3); text-align: right; font-size: 14px; }
+
+/* ── Invalid panel ─────────────────────────────────────────────────────────── */
+.inv-panel {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media(max-width:600px) { .inv-panel { grid-template-columns: 1fr; } }
+
+.inv-stat { }
+.inv-stat-val { font-size: 24px; font-weight: 700; font-family: var(--mono); color: var(--red); }
+.inv-stat-lbl { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+.inv-info { font-size: 12px; color: var(--text2); line-height: 1.7; border-left: 2px solid var(--border); padding-left: 16px; }
+.inv-info strong { color: var(--text); }
+
+/* ── Empty / loading ───────────────────────────────────────────────────────── */
+.empty { padding: 56px 24px; text-align: center; }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-title { font-size: 14px; font-weight: 600; color: var(--bright); margin-bottom: 6px; }
+.empty-desc  { font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+/* ══════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════ */
+.overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(6px);
+}
+.overlay.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: modalIn .16s ease;
+}
+@keyframes modalIn { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.modal-head {
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.modal-ic-big { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--green); letter-spacing: 1px; }
+.modal-name-big { font-size: 16px; font-weight: 600; color: var(--bright); margin-top: 3px; }
+
+.close-btn {
+  width: 32px; height: 32px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text2); cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition); flex-shrink: 0;
+}
+.close-btn:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+
+.modal-body { padding: 22px 24px; }
+
+.m-section { margin-bottom: 26px; }
+.m-section-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--green);
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--green-bg);
+  display: flex; align-items: center; gap: 8px;
+}
+.m-section-title::before { content: ''; width: 3px; height: 12px; background: var(--green); border-radius: 2px; }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media(max-width:480px) { .fields { grid-template-columns: 1fr; } }
+.field { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.field.span2 { grid-column: 1/-1; }
+.f-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-bottom: 4px; }
+.f-val { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--bright); word-break: break-all; }
+.f-val.null  { color: var(--text3); font-weight: 400; font-style: italic; font-size: 11px; }
+.f-val.green { color: var(--green); }
+.f-val.blue  { color: var(--blue); }
+.f-val.pink  { color: var(--pink); }
+.f-val.amber { color: var(--amber); }
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+footer {
+  max-width: 1280px; margin: 0 auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
+  font-size: 11px; color: var(--text3); font-family: var(--mono);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media(max-width:640px) {
+  .hide-sm { display: none; }
+  #search { width: 100%; }
+  .section-bar { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+  <a class="logo" href="#">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-name">SOCSO Radar</div>
+      <div class="logo-tag">PERKESO IC Lookup Dashboard</div>
+    </div>
+  </a>
+
+  <div class="header-right">
+    <div class="live-pill">
+      <span class="dot" id="dot"></span>
+      <span id="status">Loading…</span>
+    </div>
+
+    <button class="theme-btn" id="theme-btn" title="Toggle light/dark mode" onclick="toggleTheme()">🌙</button>
+
+    <button class="refresh-btn" onclick="loadData()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Refresh
+    </button>
+  </div>
+</header>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="card stat-card">
+      <div class="stat-accent"><span class="stat-dot green"></span><span class="stat-lbl">Valid Records</span></div>
+      <div class="stat-val" id="s-valid">—</div>
+      <div class="stat-sub">confirmed in PERKESO</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-accent"><span class="stat-dot red"></span><span class="stat-lbl">Invalid Cached</span></div>
+      <div class="stat-val" id="s-invalid">—</div>
+      <div class="stat-sub" id="s-inv-sub">re-checked after 30 days</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-accent"><span class="stat-dot amber"></span><span class="stat-lbl">Hit Rate</span></div>
+      <div class="stat-val" id="s-rate">—</div>
+      <div class="stat-sub">valid / total checked</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-accent"><span class="stat-dot blue"></span><span class="stat-lbl">Last Scan</span></div>
+      <div class="stat-val" style="font-size:18px;padding-top:6px" id="s-last">—</div>
+      <div class="stat-sub" id="s-last-sub">auto-runs 4× daily</div>
+    </div>
+  </div>
+
+  <!-- Valid table -->
+  <div class="section">
+    <div class="section-bar">
+      <div class="section-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Valid Records
+        <span class="count-badge green" id="v-badge">0</span>
+        <span class="hint hide-sm">— click row for full details</span>
+      </div>
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search" type="text" placeholder="Search name, IC, state…" oninput="filterTable()">
+      </div>
+    </div>
+    <div class="card table-card" id="v-container">
+      <div class="empty"><div class="empty-icon">📡</div><div class="empty-title">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Invalid -->
+  <div class="section">
+    <div class="section-bar">
+      <div class="section-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Invalid Cache
+        <span class="count-badge red" id="i-badge">0</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="inv-panel">
+        <div class="inv-stat">
+          <div class="inv-stat-val" id="i-count">—</div>
+          <div class="inv-stat-lbl">ICs confirmed not in PERKESO</div>
+          <div style="margin-top:12px;font-size:11px;color:var(--text3)" id="i-exp">—</div>
+        </div>
+        <div class="inv-info">
+          Entries are cached to <strong>avoid repeat API calls</strong>.<br>
+          They expire after <strong>30 days</strong> and get automatically re-checked —
+          a person may register with PERKESO at any time when they start a new job.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>SOCSO Radar · deadboy18.github.io/socso-radar</span>
+  <span id="footer-ts">—</span>
+</footer>
+
+<!-- ── Modal ──────────────────────────────────────────────────────────────── -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-ic-big" id="m-ic">—</div>
+        <div class="modal-name-big" id="m-name">—</div>
+      </div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<script>
+const VALID_URL   = './ic_results/master_valid.json';
+const INVALID_URL = './ic_results/master_invalid.json';
+
+let validData   = [];
+let invalidData = [];
+let sortCol     = 'checked_at';
+let sortDir     = -1;
+
+const RACE   = {1:'Malay',2:'Chinese',3:'Indian',4:'Others',5:'Bumiputera Sabah',6:'Bumiputera Sarawak',7:'Other Bumiputera'};
+const GENDER = {1:'Male',2:'Female'};
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  html.dataset.theme = next;
+  document.getElementById('theme-btn').textContent = next === 'dark' ? '🌙' : '☀️';
+  localStorage.setItem('socso-theme', next);
+}
+(function() {
+  const saved = localStorage.getItem('socso-theme') || 'dark';
+  document.documentElement.dataset.theme = saved;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('theme-btn').textContent = saved === 'dark' ? '🌙' : '☀️';
+  });
+})();
+
+// ── Load ───────────────────────────────────────────────────────────────────
+async function loadData() {
+  setStatus('Refreshing…', false);
+  try {
+    const [vr, ir] = await Promise.all([
+      fetch(VALID_URL   + '?t=' + Date.now()),
+      fetch(INVALID_URL + '?t=' + Date.now()),
+    ]);
+    validData   = vr.ok ? await vr.json() : [];
+    invalidData = ir.ok ? await ir.json() : [];
+    if (!Array.isArray(validData))   validData   = [];
+    if (!Array.isArray(invalidData)) invalidData = [];
+    render();
+    setStatus('Live · ' + fmtTime(), false);
+  } catch(e) {
+    setStatus('Error', true);
+    document.getElementById('v-container').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Could not load data</div><div class="empty-desc">Ensure GitHub Pages is enabled and a scan has completed.</div></div>`;
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  // Stats
+  const v = validData.length, i = invalidData.length, tot = v + i;
+  setText('s-valid',   v.toLocaleString());
+  setText('s-invalid', i.toLocaleString());
+  setText('s-rate',    tot > 0 ? ((v/tot)*100).toFixed(1) + '%' : '—');
+  setText('v-badge',   v);
+  setText('i-badge',   i);
+  setText('i-count',   i.toLocaleString());
+
+  const dates = validData.map(r => r.checked_at).filter(Boolean).sort();
+  if (dates.length) {
+    const last = dates[dates.length-1];
+    setText('s-last',     last.split(' ')[0]);
+    setText('s-last-sub', (last.split(' ')[1]||'') + ' UTC');
+  }
+
+  const cut7 = new Date(); cut7.setDate(cut7.getDate()-23);
+  const exp  = invalidData.filter(e => { try { return new Date(e.t)<cut7; } catch{return false;} }).length;
+  setText('s-inv-sub', i > 0 ? `${exp} expiring within 7 days` : 'none cached yet');
+  setText('i-exp',     `${exp} records expiring within 7 days will be re-queued soon`);
+
+  // Table
+  renderTable();
+
+  document.getElementById('footer-ts').textContent = 'auto-refreshes every 10 min · loaded ' + fmtTime();
+}
+
+function renderTable() {
+  const c = document.getElementById('v-container');
+  if (!validData.length) {
+    c.innerHTML = `<div class="empty"><div class="empty-icon">📡</div><div class="empty-title">No valid records yet</div><div class="empty-desc">Trigger a workflow run or wait for the next scheduled scan.</div></div>`;
+    return;
+  }
+
+  const sorted = [...validData].sort((a,b) => {
+    const va = String(a[sortCol]||''), vb = String(b[sortCol]||'');
+    return va < vb ? sortDir : va > vb ? -sortDir : 0;
+  });
+
+  const cols = [
+    {key:'ic_formatted',  lbl:'IC Number'},
+    {key:'name',          lbl:'Name'},
+    {key:'date_of_birth', lbl:'DOB'},
+    {key:'gender',        lbl:'Gender'},
+    {key:'pb_name',       lbl:'State'},
+    {key:'checked_at',    lbl:'Checked'},
+  ];
+
+  const ths = cols.map(c => {
+    const a = c.key === sortCol ? (sortDir===1?'↑':'↓') : '↕';
+    return `<th class="${c.key===sortCol?'active':''}" onclick="sortBy('${c.key}')">${c.lbl}<span class="arrow">${a}</span></th>`;
+  }).join('') + '<th></th>';
+
+  const trs = sorted.map(r => {
+    const pd   = r.perkeso_response?.debug?.data?.[0] || {};
+    const name = pd.name || '—';
+    const gen  = r.gender || (pd.genderId===1?'Male':'Female');
+    const gc   = gen==='Male' ? 'td-male' : 'td-fem';
+    const oi   = validData.indexOf(r);
+    return `<tr onclick="openModal(${oi})">
+      <td class="td-ic">${x(r.ic_formatted||r.ic_number||'—')}</td>
+      <td class="td-name">${x(name)}</td>
+      <td class="td-dob">${x(r.date_of_birth||pd.dob||'—')}</td>
+      <td class="${gc}">${x(gen)}</td>
+      <td class="td-state">${x(r.pb_name||'—')}</td>
+      <td class="td-date">${x((r.checked_at||'').split(' ')[0])}</td>
+      <td class="td-arrow">›</td>
+    </tr>`;
+  }).join('');
+
+  c.innerHTML = `<div class="table-scroll"><table><thead><tr>${ths}</tr></thead><tbody id="tbody">${trs}</tbody></table></div>`;
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function openModal(idx) {
+  const r  = validData[idx];
+  const pd = r.perkeso_response?.debug?.data?.[0] || {};
+  const name = pd.name || r.name || '—';
+  const gen  = GENDER[pd.genderId] || r.gender || '—';
+  const gc   = gen==='Male' ? 'blue' : 'pink';
+
+  setText('m-ic',   r.ic_formatted || r.ic_number || '—');
+  setText('m-name', name);
+
+  function f(val, cls='') {
+    const v = (val===null||val===undefined||val==='')?null:String(val);
+    if (!v || v==='null') return `<div class="f-val null">null</div>`;
+    return `<div class="f-val ${cls}">${x(v)}</div>`;
+  }
+  function row(lbl, val, cls='', span=false) {
+    return `<div class="field${span?' span2':''}"><div class="f-lbl">${lbl}</div>${f(val,cls)}</div>`;
+  }
+
+  document.getElementById('m-body').innerHTML = `
+    <div class="m-section">
+      <div class="m-section-title">Personal Information</div>
+      <div class="fields">
+        ${row('IC Number', pd.identificationNo||r.ic_number, 'green', true)}
+        ${row('Full Name', name, 'green', true)}
+        ${row('Date of Birth', pd.dob||r.date_of_birth)}
+        ${row('Gender', gen, gc)}
+        ${row('Race', RACE[pd.raceId]||null)}
+        ${row('Foreign Worker', pd.isForeignWorker!==undefined ? String(pd.isForeignWorker) : null)}
+        ${row('Date of Death', pd.dateOfDeath)}
+        ${row('ID Type', pd.idType==='2'?'MyKad (2)':pd.idType)}
+      </div>
+    </div>
+
+    <div class="m-section">
+      <div class="m-section-title">Employment</div>
+      <div class="fields">
+        ${row('SOCSO Start (Act 4)', pd.employmentStartDateAct4, 'amber')}
+        ${row('EIS Start (Act 800)', pd.employmentStartDateAct800, 'amber')}
+        ${row('Last Contribution Act 4', pd.lastContbAct4)}
+        ${row('Last Amount Act 4', pd.lastContbAct4Amount)}
+        ${row('Last Contribution Act 800', pd.lastContbAct800)}
+        ${row('Last Amount Act 800', pd.lastContbAct800Amount)}
+      </div>
+    </div>
+
+    <div class="m-section">
+      <div class="m-section-title">Address</div>
+      <div class="fields">
+        ${row('Address Line 1', pd.addressLine1, '', true)}
+        ${row('Address Line 2', pd.addressLine2, '', true)}
+        ${row('Address Line 3', pd.addressLine3, '', true)}
+        ${row('Postcode', pd.postcode)}
+        ${row('City', pd.individualCity)}
+        ${row('State', pd.individualState||r.pb_name)}
+        ${row('Country', pd.individualCountry)}
+      </div>
+    </div>
+
+    <div class="m-section">
+      <div class="m-section-title">Next of Kin</div>
+      <div class="fields">
+        ${row('Name', pd.nextOfKinName, '', true)}
+        ${row('Relationship', pd.nextOfKinRelationship)}
+        ${row('Phone', pd.nextOfKinPhoneNo)}
+        ${row('Email', pd.nextOfKinEmail, '', true)}
+        ${row('Address 1', pd.nextOfKinAddress1, '', true)}
+        ${row('Address 2', pd.nextOfKinAddress2, '', true)}
+        ${row('Address 3', pd.nextOfKinAddress3, '', true)}
+      </div>
+    </div>
+
+    <div class="m-section">
+      <div class="m-section-title">Passport / Work Permit</div>
+      <div class="fields">
+        ${row('Passport No', pd.passport)}
+        ${row('Passport Start', pd.passportStartDate)}
+        ${row('Passport End', pd.passportEndDate)}
+        ${row('Work Permit', pd.workingPermit)}
+        ${row('Permit Start', pd.permitStartDate)}
+        ${row('Permit End', pd.permitEndDate)}
+      </div>
+    </div>
+
+    <div class="m-section">
+      <div class="m-section-title">Scan Metadata</div>
+      <div class="fields">
+        ${row('Checked At', r.checked_at)}
+        ${row('State Code', r.pb_code + ' — ' + (r.pb_name||''))}
+        ${row('Sequence', r.sequence)}
+        ${row('Check Digit', r.check_digit)}
+        ${row('Gender Rule', (r.check_digit%2===1)?'Odd → Male':'Even → Female')}
+        ${row('Century Rule', r.century_rule)}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function overlayClick(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+
+// ── Sort / search ──────────────────────────────────────────────────────────
+function sortBy(col) {
+  sortDir = sortCol===col ? sortDir*-1 : -1;
+  sortCol = col;
+  renderTable();
+}
+function filterTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  document.querySelectorAll('#tbody tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function setText(id, v) { const el=document.getElementById(id); if(el) el.textContent=v; }
+function x(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtTime() { return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function setStatus(msg, err) {
+  setText('status', msg);
+  document.getElementById('dot').className = 'dot' + (err?' err':'');
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+loadData();
+setInterval(loadData, 10 * 60 * 1000);
+</script>
+</body>
+</html>
