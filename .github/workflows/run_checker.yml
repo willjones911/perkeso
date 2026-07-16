@@ -55,41 +55,75 @@ jobs:
             --to-year   "${{ github.event.inputs.to_year   || '1995' }}" \
             --max-runtime "${{ github.event.inputs.runtime_minutes || '22' }}"
 
-      - name: Commit results
+      - name: Merge and commit results
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Step 1: Back up the freshly-written result files to /tmp
-          cp ic_results/master_valid.json   /tmp/master_valid.json   2>/dev/null || true
-          cp ic_results/master_invalid.json /tmp/master_invalid.json 2>/dev/null || true
-          cp ic_results/master_progress.json /tmp/master_progress.json 2>/dev/null || true
-
-          # Step 2: Reset to the absolute latest remote state (handles any
-          # concurrent push from another queued run cleanly)
+          # Fetch latest remote state without touching working directory
           git fetch origin main
-          git reset --hard origin/main
 
-          # Step 3: Restore our updated files over the remote versions
-          cp /tmp/master_valid.json   ic_results/master_valid.json   2>/dev/null || true
-          cp /tmp/master_invalid.json ic_results/master_invalid.json 2>/dev/null || true
-          cp /tmp/master_progress.json ic_results/master_progress.json 2>/dev/null || true
+          # Write a merge script to /tmp to avoid YAML heredoc issues
+          cat > /tmp/merge_valid.py << 'PYEOF'
+          import json, os, subprocess, sys
 
-          # Step 4: Stage
-          git add ic_results/master_valid.json \
-                  ic_results/master_invalid.json \
-                  ic_results/master_progress.json 2>/dev/null || true
+          def load(path):
+              try:
+                  if os.path.exists(path) and os.path.getsize(path) > 2:
+                      return json.load(open(path, encoding='utf-8'))
+              except Exception as e:
+                  print(f"  Warning loading {path}: {e}")
+              return []
 
-          # Step 5: Commit only if something actually changed
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
+          # Load what this run produced locally
+          local_valid   = load('ic_results/master_valid.json')
+          local_invalid = load('ic_results/master_invalid.json')
+
+          print(f"  Local:  {len(local_valid)} valid, {len(local_invalid)} invalid")
+
+          # Get remote version via git show (no file system conflict)
+          r = subprocess.run(
+              ['git', 'show', 'origin/main:ic_results/master_valid.json'],
+              capture_output=True, text=True
+          )
+          remote_valid = json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else []
+          print(f"  Remote: {len(remote_valid)} valid")
+
+          # Merge: union by ic_number — local version wins for duplicates
+          # (local always has the freshest data from this run)
+          merged = {x['ic_number']: x for x in remote_valid}
+          merged.update({x['ic_number']: x for x in local_valid})
+          merged_list = sorted(merged.values(), key=lambda x: x.get('checked_at', ''))
+
+          print(f"  Merged: {len(merged_list)} unique valid records")
+
+          # Write merged file back
+          os.makedirs('ic_results', exist_ok=True)
+          with open('ic_results/master_valid.json', 'w', encoding='utf-8') as f:
+              json.dump(merged_list, f, indent=2, ensure_ascii=False, default=str)
+
+          sys.exit(0)
+          PYEOF
+
+          python3 /tmp/merge_valid.py
+
+          # Stage all result files
+          git add ic_results/master_valid.json   || true
+          git add ic_results/master_invalid.json || true
+          git add ic_results/master_progress.json || true
+
+          # Check diff against remote (not just HEAD) so we catch new files too
+          CHANGED=$(git diff --cached origin/main -- ic_results/ | head -1)
+
+          if [ -z "$CHANGED" ]; then
+            echo "No changes vs remote. Nothing to push."
             exit 0
           fi
 
-          VALID=$(python -c "import json,os; f='ic_results/master_valid.json'; print(len(json.load(open(f))) if os.path.exists(f) else 0)" 2>/dev/null || echo "?")
-          INVALID=$(python -c "import json,os; f='ic_results/master_invalid.json'; print(len(json.load(open(f))) if os.path.exists(f) else 0)" 2>/dev/null || echo "?")
+          VALID=$(python3 -c "import json; print(len(json.load(open('ic_results/master_valid.json'))))" 2>/dev/null || echo "?")
+          INVALID=$(python3 -c "import json; print(len(json.load(open('ic_results/master_invalid.json'))))" 2>/dev/null || echo "?")
 
           git commit -m "scan $(date -u +'%Y-%m-%d %H:%M UTC') | valid: ${VALID} | invalid: ${INVALID}"
-          git push origin main
+          git push origin HEAD:main
 
-          echo "✅ Committed — valid: ${VALID} | invalid: ${INVALID}"
+          echo "✅ Pushed — valid: ${VALID} | invalid: ${INVALID}"
