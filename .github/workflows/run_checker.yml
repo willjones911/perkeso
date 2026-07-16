@@ -1,12 +1,9 @@
 name: PERKESO IC Checker
 
 on:
-  # Runs every 30 minutes — each job takes ~25 min so there's
-  # only a ~5 min gap between scans. Effectively continuous.
   schedule:
     - cron: '*/30 * * * *'
 
-  # Manual trigger with optional overrides
   workflow_dispatch:
     inputs:
       mode:
@@ -17,13 +14,11 @@ on:
         default: '22'
       from_year:
         description: 'Birth year from'
-        default: '1965'
+        default: '1970'
       to_year:
         description: 'Birth year to'
-        default: '2000'
+        default: '1995'
 
-# Only one run at a time. If the 30-min cron fires while a
-# job is still running, it queues — never cancels mid-scan.
 concurrency:
   group: perkeso-checker
   cancel-in-progress: false
@@ -56,8 +51,8 @@ jobs:
           python ic_checker.py \
             --mode "${{ github.event.inputs.mode || '1' }}" \
             --workers 3 \
-            --from-year "${{ github.event.inputs.from_year || '1965' }}" \
-            --to-year   "${{ github.event.inputs.to_year   || '2000' }}" \
+            --from-year "${{ github.event.inputs.from_year || '1970' }}" \
+            --to-year   "${{ github.event.inputs.to_year   || '1995' }}" \
             --max-runtime "${{ github.event.inputs.runtime_minutes || '22' }}"
 
       - name: Commit results
@@ -65,23 +60,36 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Stage result files first
+          # Step 1: Back up the freshly-written result files to /tmp
+          cp ic_results/master_valid.json   /tmp/master_valid.json   2>/dev/null || true
+          cp ic_results/master_invalid.json /tmp/master_invalid.json 2>/dev/null || true
+          cp ic_results/master_progress.json /tmp/master_progress.json 2>/dev/null || true
+
+          # Step 2: Reset to the absolute latest remote state (handles any
+          # concurrent push from another queued run cleanly)
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Step 3: Restore our updated files over the remote versions
+          cp /tmp/master_valid.json   ic_results/master_valid.json   2>/dev/null || true
+          cp /tmp/master_invalid.json ic_results/master_invalid.json 2>/dev/null || true
+          cp /tmp/master_progress.json ic_results/master_progress.json 2>/dev/null || true
+
+          # Step 4: Stage
           git add ic_results/master_valid.json \
                   ic_results/master_invalid.json \
                   ic_results/master_progress.json 2>/dev/null || true
 
-          # Exit early if nothing changed
+          # Step 5: Commit only if something actually changed
           if git diff --staged --quiet; then
-            echo "Nothing to commit."
+            echo "No changes to commit."
             exit 0
           fi
-
-          # --autostash: stashes our staged changes before rebasing,
-          # reapplies them after — fixes "unstaged changes" error
-          git pull --rebase --autostash origin main
 
           VALID=$(python -c "import json,os; f='ic_results/master_valid.json'; print(len(json.load(open(f))) if os.path.exists(f) else 0)" 2>/dev/null || echo "?")
           INVALID=$(python -c "import json,os; f='ic_results/master_invalid.json'; print(len(json.load(open(f))) if os.path.exists(f) else 0)" 2>/dev/null || echo "?")
 
           git commit -m "scan $(date -u +'%Y-%m-%d %H:%M UTC') | valid: ${VALID} | invalid: ${INVALID}"
-          git push
+          git push origin main
+
+          echo "✅ Committed — valid: ${VALID} | invalid: ${INVALID}"
